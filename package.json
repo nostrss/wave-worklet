@@ -1,5 +1,10 @@
 {
   "name": "wave-worklet",
+  "homepage": "https://github.com/nostrss/wave-worklet",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nostrss/wave-worklet.git"
+  },
   "version": "0.0.1",
   "description": "A library for recording audio using AudioWorklet",
   "main": "dist/wave-worklet.umd.js",
@@ -17,5 +22,9 @@
   "devDependencies": {
     "vite": "^5.4.10"
   },
-  "files": ["dist","src","README.md"]
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ]
 }
