@@ -1,0 +1,21 @@
+{
+  "name": "wave-worklet",
+  "version": "0.0.1",
+  "description": "A library for recording audio using AudioWorklet",
+  "main": "dist/wave-worklet.umd.js",
+  "scripts": {
+    "build": "vite build"
+  },
+  "keywords": [
+    "audio",
+    "worklet",
+    "recorder",
+    "wave"
+  ],
+  "author": "jin taek woo",
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^5.4.10"
+  },
+  "files": ["dist","src","README.md"]
+}

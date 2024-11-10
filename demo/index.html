@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Audio Recorder Worklet</title>
+  </head>
+  <body>
+    <button id="start">Start Recording</button>
+    <button id="stop">Stop Recording</button>
+    <audio id="audio-player" controls></audio>
+
+    <script type="module">
+      import { WaveWorklet } from '../src/index.js'
+
+      let recorder = null
+
+      document.getElementById('start').addEventListener('click', async () => {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+          })
+          const context = new AudioContext()
+          const source = context.createMediaStreamSource(stream)
+
+          recorder = new WaveWorklet(context, source)
+          await recorder.init()
+
+          recorder.startRecording()
+          console.log('Recording started')
+        } catch (err) {
+          console.error('Failed to start recording:', err)
+        }
+      })
+
+      document.getElementById('stop').addEventListener('click', async () => {
+        if (!recorder) {
+          console.error('Recorder가 초기화되지 않았습니다.')
+          return
+        }
+
+        try {
+          const wavBuffer = await recorder.stopRecording()
+          const blob = new Blob([wavBuffer], { type: 'audio/wav' })
+          const url = URL.createObjectURL(blob)
+          const audioPlayer = document.getElementById('audio-player')
+          audioPlayer.src = url
+        } catch (err) {
+          console.error('Failed to stop recording:', err)
+        }
+      })
+    </script>
+  </body>
+</html>
