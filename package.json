@@ -9,7 +9,7 @@
   "description": "A library for recording audio using AudioWorklet",
   "main": "dist/wave-worklet.umd.js",
   "scripts": {
-    "build": "tsc && vite build"
+    "build": "vite build && npx tsc "
   },
   "keywords": [
     "audio",
@@ -26,7 +26,6 @@
   },
   "files": [
     "dist",
-    "src",
     "README.md"
   ]
 }
