@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "module": "ESNext",
+    "lib": ["DOM", "ESNext"],
+    "declaration": true, // 타입 선언 파일 생성
+    "declarationDir": "dist", // 생성된 .d.ts 파일을 저장할 디렉터리
+    "outDir": "dist", // 컴파일된 파일 출력 디렉터리
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

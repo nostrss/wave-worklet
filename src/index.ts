@@ -1,11 +1,16 @@
 export class WaveWorklet {
+  private context: AudioContext
+  private source: MediaStreamAudioSourceNode
+  private processorURL: URL
+  private audioNode: AudioWorkletNode | null
+
   /**
    * Constructor for WaveWorklet
    * @param {AudioContext} context - The AudioContext instance.
    * @param {MediaStreamAudioSourceNode} streamSource - The MediaStreamSource node created from the microphone input.
    * @throws Will throw an error if context or streamSource is not provided.
    */
-  constructor(context, streamSource) {
+  constructor(context: AudioContext, streamSource: MediaStreamAudioSourceNode) {
     if (!context || !streamSource) {
       throw new Error('AudioContext and MediaStreamSource are required.')
     }
@@ -20,7 +25,7 @@ export class WaveWorklet {
    * Initializes the AudioWorkletNode and connects the source to it.
    * @throws Will throw an error if the worklet module cannot be added.
    */
-  async init() {
+  async init(): Promise<void> {
     // Register the AudioWorkletProcessor
     await this.context.audioWorklet.addModule(this.processorURL)
     this.audioNode = new AudioWorkletNode(this.context, 'wave-worklet')
@@ -32,7 +37,7 @@ export class WaveWorklet {
    * Starts recording by sending a 'start' message to the AudioWorkletProcessor.
    * @throws Will throw an error if the AudioWorkletNode is not initialized.
    */
-  startRecording() {
+  startRecording(): void {
     if (!this.audioNode) {
       throw new Error('WaveWorklet is not initialized.')
     }
@@ -45,17 +50,20 @@ export class WaveWorklet {
    * @returns {Promise<ArrayBuffer>} - The WAV buffer containing the recorded audio.
    * @throws Will throw an error if the AudioWorkletNode is not initialized.
    */
-  async stopRecording() {
+  async stopRecording(): Promise<ArrayBuffer> {
     if (!this.audioNode) {
       throw new Error('WaveWorklet is not initialized.')
     }
 
-    return new Promise(resolve => {
-      this.audioNode.port.onmessage = event => {
+    return new Promise<ArrayBuffer>(resolve => {
+      this.audioNode!.port.onmessage = (event: MessageEvent) => {
         if (event.data.wavBuffer) {
           console.log('Recording stopped, WAV buffer received')
           resolve(event.data.wavBuffer)
         }
+      }
+      if (!this.audioNode) {
+        throw new Error('WaveWorklet is not initialized.')
       }
       this.audioNode.port.postMessage('flush')
     })
