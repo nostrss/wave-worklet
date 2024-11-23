@@ -19,6 +19,7 @@
   ],
   "author": "jin taek woo",
   "license": "MIT",
+  "types": "dist/index.d.ts",
   "devDependencies": {
     "@types/node": "^22.9.0",
     "typescript": "^5.6.3",
