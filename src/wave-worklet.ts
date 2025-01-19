@@ -1,18 +1,26 @@
+// src/wave-worklet.ts
+
 class RecorderProcessor extends AudioWorkletProcessor {
-  // A buffer to store incoming audio data
-  private _buffer: Float32Array[]
+  // A buffer to store incoming audio data for each channel
+  private _buffers: Float32Array[][]
   // The audio sample rate
   private sampleRate: number
+
+  // The number of audio channels
+  private numberOfChannels: number
 
   constructor(options: AudioWorkletNodeOptions) {
     // Call the parent class constructor
     super()
 
-    // Initialize the buffer
-    this._buffer = []
+    // Initialize the buffer as an empty array of arrays
+    this._buffers = []
 
-    // Obtain the sample rate from the audio context
-    this.sampleRate = (options as any).context.sampleRate
+    // Obtain the sample rate from the global scope
+    this.sampleRate = sampleRate // Use the global sampleRate
+
+    // Initialize the number of channels to 1 (mono)
+    this.numberOfChannels = 1
 
     // Listen for messages from the main thread
     this.port.onmessage = (event: MessageEvent) => {
@@ -20,26 +28,37 @@ class RecorderProcessor extends AudioWorkletProcessor {
       if (event.data === 'flush') {
         this._flush()
       }
+      // If you need any handling for other messages, you can add them here
+      // else if (event.data === 'start') {
+      //   this._start()
+      // }
     }
   }
 
   /**
    * This method is called for every block of audio processing.
    * It receives audio inputs, processes them, and can produce outputs.
-   * In this case, we simply store the input data in a buffer.
+   * In this case, we store the input data in a buffer for each channel.
    * @param inputs - An array of input channels, each containing an array of audio samples
    * @returns true to keep the processor alive
    */
   process(inputs: Float32Array[][]): boolean {
-    // inputs[0] is the first channel of the first input
     const input = inputs[0]
     if (input.length > 0) {
-      // Get the data for the first channel
-      const channelData = input[0]
-      // Store a copy of the channel data in the buffer
-      this._buffer.push(new Float32Array(channelData))
+      // Set the number of channels based on the first block of data
+      if (this.numberOfChannels === 1) {
+        this.numberOfChannels = input.length
+      }
+
+      // Initialize buffers for new channels if necessary
+      for (let channel = 0; channel < this.numberOfChannels; channel++) {
+        const channelData = input[channel]
+        if (!this._buffers[channel]) {
+          this._buffers[channel] = []
+        }
+        this._buffers[channel].push(new Float32Array(channelData))
+      }
     }
-    // Returning true ensures the processor will continue to run
     return true
   }
 
@@ -49,70 +68,96 @@ class RecorderProcessor extends AudioWorkletProcessor {
    */
   private _flush(): void {
     // If there is any buffered data
-    if (this._buffer.length > 0) {
+    if (this._buffers.length > 0) {
       // Encode the data into a WAV file
-      const wavBuffer = this.encodeWAV(this._buffer, this.sampleRate)
+      const wavBuffer = this.encodeWAV(
+        this._buffers,
+        this.sampleRate,
+        this.numberOfChannels
+      )
 
       // Post the WAV data back to the main thread
       // Transfer the ArrayBuffer so it doesn't get copied
       this.port.postMessage({ wavBuffer }, [wavBuffer])
 
       // Clear the buffer
-      this._buffer = []
+      this._buffers = []
     }
   }
 
   /**
    * Encodes the recorded samples into a 16-bit PCM WAV file.
-   * @param samples - Array of Float32Array representing each chunk of recorded audio
+   * @param samples - Array of Float32Array arrays representing each channel's recorded audio
    * @param sampleRate - The sample rate of the audio
+   * @param channels - Number of audio channels
    * @returns An ArrayBuffer containing the encoded WAV data
    */
-  private encodeWAV(samples: Float32Array[], sampleRate: number): ArrayBuffer {
-    // Calculate the total buffer length needed for PCM data (2 bytes per sample)
-    const bufferLength = samples.length * samples[0].length * 2
+  /**
+   * Encodes the recorded samples into a 16-bit PCM WAV file.
+   * @param samples - Array of Float32Array arrays representing each channel's recorded audio
+   * @param sampleRate - The sample rate of the audio
+   * @param channels - Number of audio channels
+   * @returns An ArrayBuffer containing the encoded WAV data
+   */
+  private encodeWAV(
+    samples: Float32Array[][],
+    sampleRate: number,
+    channels: number
+  ): ArrayBuffer {
+    // 1) 각 채널별로 쌓인 chunk 들을 하나로 합친다
+    const flattenedChannels = samples.map(chunks => {
+      // chunks => Float32Array[]
+      const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0)
+      const merged = new Float32Array(totalLength)
 
-    // Create an ArrayBuffer with space for the WAV header plus the PCM data
+      let offset = 0
+      for (const chunk of chunks) {
+        merged.set(chunk, offset)
+        offset += chunk.length
+      }
+      return merged // Float32Array
+    })
+
+    // (예시) 모든 채널 길이가 동일하다고 가정
+    // 실제로는 길이가 다를 수 있으니, 가장 짧은 길이 혹은 가장 긴 길이 등
+    // 로직을 조정해야 할 수도 있음.
+    const totalSamples = flattenedChannels[0].length
+
+    // 2) 이번 예시는 모노(1채널)만 다룬다고 가정
+    //    만약 스테레오 이상이라면 아래에서 interleave 형태로 작성해야 함.
+    //    channels = 1 이면 그냥 모노
+    //    channels = 2 이상이면 for 루프에서 sample interleave
+
+    // 아래 코드도 실제로는 interleaving 처리 필요
+    const bufferLength = totalSamples * channels * 2
     const buffer = new ArrayBuffer(44 + bufferLength)
     const view = new DataView(buffer)
 
     // Write the RIFF header
     this.writeString(view, 0, 'RIFF')
-    // File size: 36 + data size
     view.setUint32(4, 36 + bufferLength, true)
-    // WAVE type
     this.writeString(view, 8, 'WAVE')
-    // Format chunk identifier
     this.writeString(view, 12, 'fmt ')
-    // Format chunk length (16 for PCM)
     view.setUint32(16, 16, true)
-    // Audio format (1 = PCM)
     view.setUint16(20, 1, true)
-    // Number of channels (1 = mono)
-    view.setUint16(22, 1, true)
-    // Sample rate
+    view.setUint16(22, channels, true)
     view.setUint32(24, sampleRate, true)
-    // Byte rate = sampleRate * blockAlign
-    view.setUint32(28, sampleRate * 2, true)
-    // Block align = number of channels * bytesPerSample
-    view.setUint16(32, 2, true)
-    // Bits per sample (16)
+    view.setUint32(28, sampleRate * channels * 2, true)
+    view.setUint16(32, channels * 2, true)
     view.setUint16(34, 16, true)
-    // Data chunk identifier
     this.writeString(view, 36, 'data')
-    // Data chunk length
     view.setUint32(40, bufferLength, true)
 
+    // 3) 모노(1채널)라고 가정하고, flatten된 데이터 하나만 사용 (flattenedChannels[0])
     let offset = 44
-    // Write the PCM samples
-    for (let i = 0; i < samples.length; i++) {
-      const sample = samples[i]
-      for (let j = 0; j < sample.length; j++) {
-        // Clamp the value between -1 and 1, then scale to 16-bit
-        const s = Math.max(-1, Math.min(1, sample[j]))
-        view.setInt16(offset, s * 0x7fff, true)
-        offset += 2
-      }
+    const channelData = flattenedChannels[0] // 모노면 0번 채널만
+
+    for (let i = 0; i < totalSamples; i++) {
+      let s = channelData[i]
+      // clamp
+      s = Math.max(-1, Math.min(1, s))
+      view.setInt16(offset, s * 0x7fff, true)
+      offset += 2
     }
 
     return buffer

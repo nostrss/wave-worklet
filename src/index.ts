@@ -1,3 +1,5 @@
+// src/index.ts
+
 export class WaveWorklet {
   private context: AudioContext
   private source: MediaStreamAudioSourceNode
@@ -17,7 +19,8 @@ export class WaveWorklet {
 
     this.context = context
     this.source = streamSource // MediaStreamSource provided by the user
-    this.processorURL = new URL('./wave-worklet.ts', import.meta.url)
+    // @vite-ignore
+    this.processorURL = new URL('./wave-worklet.js', import.meta.url) // Updated to .js
     this.audioNode = null
   }
 
@@ -34,14 +37,13 @@ export class WaveWorklet {
   }
 
   /**
-   * Starts recording by sending a 'start' message to the AudioWorkletProcessor.
+   * Starts recording.
    * @throws Will throw an error if the AudioWorkletNode is not initialized.
    */
   startRecording(): void {
     if (!this.audioNode) {
       throw new Error('WaveWorklet is not initialized.')
     }
-    this.audioNode.port.postMessage('start')
     console.log('Recording started')
   }
 
@@ -55,17 +57,16 @@ export class WaveWorklet {
       throw new Error('WaveWorklet is not initialized.')
     }
 
+    const audioNode = this.audioNode // Assign to local variable to ensure non-null
+
     return new Promise<ArrayBuffer>(resolve => {
-      this.audioNode!.port.onmessage = (event: MessageEvent) => {
+      audioNode.port.onmessage = (event: MessageEvent) => {
         if (event.data.wavBuffer) {
           console.log('Recording stopped, WAV buffer received')
           resolve(event.data.wavBuffer)
         }
       }
-      if (!this.audioNode) {
-        throw new Error('WaveWorklet is not initialized.')
-      }
-      this.audioNode.port.postMessage('flush')
+      audioNode.port.postMessage('flush')
     })
   }
 }

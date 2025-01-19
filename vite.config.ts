@@ -1,13 +1,14 @@
 import { defineConfig } from 'vite'
+import path from 'path'
 
 export default defineConfig({
   build: {
+    outDir: 'dist', // Library output folder
     lib: {
-      entry: './src/index.ts',
+      entry: path.resolve(__dirname, 'src/index.ts'),
       name: 'WaveWorklet',
-      fileName: 'wave-worklet',
+      fileName: format => `wave-worklet.${format}.js`,
       formats: ['umd', 'es'],
     },
-    outDir: 'dist',
   },
 })
