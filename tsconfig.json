@@ -2,14 +2,15 @@
   "compilerOptions": {
     "target": "ES6",
     "module": "ESNext",
-    "lib": ["DOM", "ESNext"],
+    "lib": ["DOM", "ESNext", "WebWorker"],
     "declaration": true,
     "declarationDir": "dist", // .d.ts 파일 출력 위치
     "outDir": "dist", // .js 파일 출력 위치
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["node"]
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "wave-worklet.d.ts"],
   "exclude": ["node_modules", "dist"]
 }

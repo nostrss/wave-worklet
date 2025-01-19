@@ -17,7 +17,7 @@ export class WaveWorklet {
 
     this.context = context
     this.source = streamSource // MediaStreamSource provided by the user
-    this.processorURL = new URL('./wave-worklet.js', import.meta.url)
+    this.processorURL = new URL('./wave-worklet.ts', import.meta.url)
     this.audioNode = null
   }
 

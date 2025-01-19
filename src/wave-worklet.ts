@@ -1,16 +1,19 @@
 class RecorderProcessor extends AudioWorkletProcessor {
-  constructor() {
+  private _buffer: Float32Array[]
+  private sampleRate: number
+
+  constructor(options: AudioWorkletNodeOptions) {
     super()
     this._buffer = []
-    this.sampleRate = sampleRate // Ensure sampleRate is defined correctly
-    this.port.onmessage = event => {
+    this.sampleRate = (options as any).context.sampleRate // AudioContext에서 sampleRate 가져오기
+    this.port.onmessage = (event: MessageEvent) => {
       if (event.data === 'flush') {
         this._flush()
       }
     }
   }
 
-  process(inputs) {
+  process(inputs: Float32Array[][]): boolean {
     const input = inputs[0]
     if (input.length > 0) {
       const channelData = input[0]
@@ -19,7 +22,7 @@ class RecorderProcessor extends AudioWorkletProcessor {
     return true
   }
 
-  _flush() {
+  private _flush(): void {
     if (this._buffer.length > 0) {
       const wavBuffer = this.encodeWAV(this._buffer, this.sampleRate)
       this.port.postMessage({ wavBuffer }, [wavBuffer])
@@ -27,7 +30,7 @@ class RecorderProcessor extends AudioWorkletProcessor {
     }
   }
 
-  encodeWAV(samples, sampleRate) {
+  private encodeWAV(samples: Float32Array[], sampleRate: number): ArrayBuffer {
     const bufferLength = samples.length * samples[0].length * 2
     const buffer = new ArrayBuffer(44 + bufferLength)
     const view = new DataView(buffer)
@@ -59,7 +62,7 @@ class RecorderProcessor extends AudioWorkletProcessor {
     return buffer
   }
 
-  writeString(view, offset, string) {
+  private writeString(view: DataView, offset: number, string: string): void {
     for (let i = 0; i < string.length; i++) {
       view.setUint8(offset + i, string.charCodeAt(i))
     }
