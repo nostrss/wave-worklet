@@ -18,9 +18,9 @@ export class WaveWorklet {
     }
 
     this.context = context
-    this.source = streamSource // MediaStreamSource provided by the user
+    this.source = streamSource
     // @vite-ignore
-    this.processorURL = new URL('./wave-worklet.js', import.meta.url) // Updated to .js
+    this.processorURL = new URL('./wave-worklet.js', import.meta.url)
     this.audioNode = null
   }
 
@@ -29,11 +29,10 @@ export class WaveWorklet {
    * @throws Will throw an error if the worklet module cannot be added.
    */
   async init(): Promise<void> {
-    // Register the AudioWorkletProcessor
     await this.context.audioWorklet.addModule(this.processorURL)
     this.audioNode = new AudioWorkletNode(this.context, 'wave-worklet')
     this.source.connect(this.audioNode)
-    this.audioNode.connect(this.context.destination) // Optional: Connect to the destination for debugging purposes
+    this.audioNode.connect(this.context.destination) // optional connection for testing
   }
 
   /**
@@ -48,24 +47,54 @@ export class WaveWorklet {
   }
 
   /**
-   * Stops recording and retrieves the WAV buffer from the AudioWorkletProcessor.
-   * @returns {Promise<ArrayBuffer>} - The WAV buffer containing the recorded audio.
+   * Stops recording, retrieves the WAV buffer, and cleans up resources.
+   * @returns {Promise<ArrayBuffer>} The WAV buffer.
    * @throws Will throw an error if the AudioWorkletNode is not initialized.
    */
   async stopRecording(): Promise<ArrayBuffer> {
+    return this.flushAndGetWave(/* shouldCleanup */ true)
+  }
+
+  /**
+   * Flushes the recorded audio but continues recording without cleanup.
+   * @returns {Promise<ArrayBuffer>} The WAV buffer.
+   * @throws Will throw an error if the AudioWorkletNode is not initialized.
+   */
+  async flushWaveFile(): Promise<ArrayBuffer> {
+    return this.flushAndGetWave(/* shouldCleanup */ false)
+  }
+
+  /**
+   * Internal method to flush the current buffer from the AudioWorkletNode,
+   * returning the WAV data. Can optionally clean up the node.
+   * @param shouldCleanup - Whether to disconnect and close the node after flushing
+   * @returns A promise that resolves to the WAV ArrayBuffer
+   */
+  private flushAndGetWave(shouldCleanup: boolean): Promise<ArrayBuffer> {
     if (!this.audioNode) {
-      throw new Error('WaveWorklet is not initialized.')
+      return Promise.reject(new Error('WaveWorklet is not initialized.'))
     }
 
-    const audioNode = this.audioNode // Assign to local variable to ensure non-null
+    const audioNode = this.audioNode
 
     return new Promise<ArrayBuffer>(resolve => {
+      // Handle the message from the AudioWorkletProcessor
       audioNode.port.onmessage = (event: MessageEvent) => {
         if (event.data.wavBuffer) {
-          console.log('Recording stopped, WAV buffer received')
+          console.log('WAV buffer received')
           resolve(event.data.wavBuffer)
+
+          // If shouldCleanup is true, disconnect and close the port
+          if (shouldCleanup) {
+            this.source.disconnect(audioNode)
+            audioNode.disconnect()
+            audioNode.port.close()
+            this.audioNode = null
+          }
         }
       }
+
+      // Request the processor to flush its buffer
       audioNode.port.postMessage('flush')
     })
   }
