@@ -1,4 +1,4 @@
-// src/index.ts
+import waveWorkletUrl from './wave-worklet.ts?url'
 
 export class WaveWorklet {
   private context: AudioContext
@@ -20,7 +20,7 @@ export class WaveWorklet {
     this.context = context
     this.source = streamSource
     // @vite-ignore
-    this.processorURL = new URL('./wave-worklet.js', import.meta.url)
+    this.processorURL = new URL(waveWorkletUrl, import.meta.url)
     this.audioNode = null
   }
 
